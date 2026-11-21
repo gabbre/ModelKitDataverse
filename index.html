@@ -414,7 +414,8 @@ body.vlist .card::before,html[data-skin] body.vlist .card::before{width:4px;heig
     <button type="button" id="bPaste" style="flex:0 0 auto">Incolla</button>
   </div>
   <div class="row fit" style="margin-top:8px"><a class="btn" id="bSearch" href="https://www.scalemates.com/search.php" target="_blank" rel="noopener">Cerca su Scalemates ↗</a><a class="btn" id="bGoogle" href="https://www.google.com/" target="_blank" rel="noopener">Cerca con Google ↗</a></div>
-  <div class="hint" id="urlHint">Cerca il kit su Scalemates, copia l’indirizzo della scheda e premi «Incolla link»: marca, codice e nome si compilano da soli.</div>
+  <div class="row fit" id="smBox" style="margin-top:8px;display:none"><a class="btn" id="bOpenSm" href="#" target="_blank" rel="noopener">Apri la scheda e usa il bookmarklet per la foto ↗</a></div>
+  <div class="hint" id="urlHint">Il modo più rapido: dalla scheda del kit su Scalemates usa il bookmarklet, che compila tutto compresa la foto. Se incolli solo il link qui, si compilano marca, codice e nome.</div>
   <div class="row">
     <div><label for="fBrand">Marca</label><input id="fBrand"></div>
     <div><label for="fCode">Codice</label><input id="fCode"></div>
@@ -439,9 +440,9 @@ body.vlist .card::before,html[data-skin] body.vlist .card::before{width:4px;heig
 
 <dialog id="dBm">
   <h2 style="margin:0 0 8px;font-size:1.15rem">Bookmarklet per Scalemates</h2>
-  <div class="hint" style="margin:0 0 10px">Trascina il pulsante qui sotto nella barra dei preferiti (il server deve essere acceso). Poi, su una scheda kit di Scalemates, cliccalo: si apre il catalogo con il modulo già compilato (marca, codice, nome, scala, grado e foto della scatola). Controlla e premi «Salva». Se il kit è già nel catalogo, si apre quello esistente.</div>
+  <div class="hint" style="margin:0 0 10px">È il modo per aggiungere un kit con la <b>foto della scatola</b>: sulla scheda del kit su Scalemates lo attivi e si apre il catalogo con marca, codice, nome, scala, grado e foto già compilati. Se il kit c’è già, si apre quello.<br><br><b>PC:</b> trascina il pulsante qui sotto nella barra dei preferiti, poi cliccalo sulla scheda del kit.<br><b>Telefono:</b> premi «Copia codice», salva un preferito qualsiasi, modificalo chiamandolo <b>kit</b> e incolla il codice come indirizzo. Sulla scheda del kit scrivi «kit» nella barra degli indirizzi e tocca il preferito che compare.</div>
   <div class="row fit"><a id="bmLink" href="#" draggable="true" style="padding:9px 14px;border-radius:8px;background:var(--accent);color:var(--accent-text);text-decoration:none;font-weight:600">📥 Kit → Catalogo</a></div>
-  <div class="hint" style="margin-top:10px">Se il trascinamento non funziona: crea un preferito a mano e incolla questo codice come indirizzo.</div>
+  <div class="hint" style="margin-top:10px">Il codice da copiare (va rifatto solo se cambia l’indirizzo del sito):</div>
   <div class="row fit" style="margin-top:8px"><button type="button" id="bmCopy">Copia codice</button></div>
   <textarea id="bmCode" rows="3" readonly style="margin-top:8px;font-size:.75rem"></textarea>
   <div class="hint" id="bmMsg"></div>
@@ -687,7 +688,7 @@ function render(){
   [[kits.length,'kit',''],[cnt('ordinato'),'Ordinati','ordinato'],[cnt('scatola'),'Backlog','scatola'],[cnt('costruzione'),'in costruzione','costruzione'],[cnt('finito'),'finiti','finito'],[cnt('wishlist'),'in wishlist','wishlist']].forEach(([n,l,v])=>{const s=document.createElement('button');s.type='button';s.className='pill'+(fs===v?' on':'');s.title=v?'Mostra solo: '+ST[v]:'Mostra tutti i kit';s.setAttribute('aria-pressed',fs===v?'true':'false');const b=document.createElement('b');b.textContent=n;s.append(b,' '+l);s.insertAdjacentHTML('afterbegin',ico(v||'tutti'));s.onclick=()=>{$('#fStato').value=(v&&fs===v)?'':v;render()};st.append(s)});
 }
 
-function showPhoto(){const p=$('#prev');setImgSrc(p,photo);p.style.display=photo?'block':'none'}
+function showPhoto(){const p=$('#prev');setImgSrc(p,photo);p.style.display=photo?'block':'none';if(typeof smLink==='function'&&$('#smBox'))smLink()}
 function openKit(k){
   editing=k||null;photo=k?k.photo||null:null;
   $('#dTitle').textContent=k?'Modifica kit':'Nuovo kit';
@@ -695,7 +696,7 @@ function openKit(k){
   $('#fName').value=k?k.name:'';$('#fScale').value=k?k.scale:'';$('#fGrade').value=k?(k.grade||'NG'):'NG';gradeTouched=!!k;$('#fStatus').value=k?k.status:'scatola';
   $('#fNotes').value=k?k.notes:'';$('#fBoot2').checked=!!(k&&k.bootleg);$('#fCopy').value=k&&k.copyOf||'';$('#bootBox').style.display=$('#fBoot2').checked?'':'none';$('#bDel').style.display=k?'':'none';
   $('#urlHint').textContent='Cerca il kit su Scalemates, copia l’indirizzo della scheda e premi «Incolla link»: marca, codice e nome si compilano da soli.';
-  showPhoto();$('#dlg').showModal();
+  showPhoto();smLink();$('#dlg').showModal();
 }
 async function saveKit(){
   const k=editing||{id:Date.now().toString(36)+Math.random().toString(36).slice(2,6),added:Date.now()};
@@ -793,7 +794,9 @@ function trimWhite(img){
   o.getContext('2d').drawImage(c,l,t,o.width,o.height,0,0,o.width,o.height);return o}
 function shrink(u){return new Promise(res=>{const i=new Image();i.onload=()=>{const src=trimWhite(i)||i;const f=Math.min(1,700/Math.max(src.width,src.height)),c=document.createElement('canvas');c.width=Math.round(src.width*f);c.height=Math.round(src.height*f);c.getContext('2d').drawImage(src,0,0,c.width,c.height);res(c.toDataURL('image/jpeg',.78))};i.onerror=()=>res(u);i.src=u})}
 const _au=applyUrl;
-applyUrl=function(u){_au(u);u=u.trim();if(/^https:\/\/(www\.)?scalemates\.com\/kits\//i.test(u))$('#urlHint').textContent='Dati letti dal link. Per foto e scala usa il bookmarklet dalla pagina del kit, oppure aggiungi una foto tu.'};
+applyUrl=function(u){_au(u);u=u.trim();if(/^https:\/\/(www\.)?scalemates\.com\/kits\//i.test(u)){$('#urlHint').textContent='Dati letti dal link. Il sito di Scalemates non lascia scaricare la foto da qui: tocca il pulsante sopra, poi sulla scheda usa il bookmarklet (oppure aggiungi una foto tu).';smLink()}};
+function smLink(){const u=$('#fUrl').value.trim(),ok=/^https:\/\/(www\.)?scalemates\.com\/kits\//i.test(u);$('#smBox').style.display=ok&&!photo?'':'none';if(ok)$('#bOpenSm').href=u}
+$('#fUrl').addEventListener('input',smLink);
 // bookmarklet: legge la scheda nel browser (Scalemates blocca le letture automatiche dal server) e apre il catalogo gia' compilato
 function bmGrab(T){if(location.pathname.indexOf('/kits/')<0){alert('Apri prima la scheda di un kit su Scalemates');return}
 var q=function(s){return document.querySelector(s)},d=(q('meta[name=description]')||{}).content||'';
